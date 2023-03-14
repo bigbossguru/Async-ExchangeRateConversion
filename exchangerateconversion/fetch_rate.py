@@ -4,7 +4,14 @@ import aiohttp
 
 from .config import config
 
+
 CURRENCY_RATE_CACHE: Dict[str, Tuple[float, datetime]] = {}  # {currency: (rate, expiration)}
+
+
+class ExchangeException(Exception):
+    """
+    Exception say about unable to get exchange rate
+    """
 
 
 async def get_exchange_rate(currency: str, date: datetime) -> float:
@@ -13,7 +20,7 @@ async def get_exchange_rate(currency: str, date: datetime) -> float:
     """
     if currency in CURRENCY_RATE_CACHE:
         rate, expiration = CURRENCY_RATE_CACHE[currency]
-        if datetime.now() >= expiration:
+        if datetime.now() < expiration:
             return rate
 
     async with aiohttp.ClientSession() as session:
@@ -22,11 +29,8 @@ async def get_exchange_rate(currency: str, date: datetime) -> float:
         ) as response:
             data = await response.json()
             if response.status != 200:
-                raise Exception(f"Unable to get exchange rate for {currency}")
+                raise ExchangeException(f"Unable to get exchange rate for {currency}")
 
             rate = data["info"]["rate"]
-            CURRENCY_RATE_CACHE[currency] = (
-                rate,
-                datetime.now() + config.EXPIRE_CACHE_TIME,
-            )
+            CURRENCY_RATE_CACHE[currency] = (rate, datetime.now() + config.EXPIRE_CACHE_TIME)
             return rate
