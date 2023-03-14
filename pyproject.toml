@@ -1,0 +1,45 @@
+[tool.poetry]
+name = "exchangerate-conversion"
+version = "0.1.0"
+description = "Async Exchange Rate Conversion"
+authors = ["Eldar Gazizov <kursus1010@gmail.com>"]
+readme = "README.md"
+packages = [{include = "exchangerateconversion"}]
+
+
+[tool.poetry.dependencies]
+python = "^3.11"
+websockets = "^10.4"
+aiohttp = "^3.8.4"
+pydantic = "^1.10.6"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.1.0"
+mypy = "^1.1.1"
+pylint = "^2.17.0"
+pytest = "^7.2.2"
+pytest-asyncio = "^0.20.3"
+pytest-aiohttp = "^1.0.4"
+
+
+[tool.pylint.'MESSAGES CONTROL']
+max-line-length = 120
+disable = [
+    "no-member",
+    "invalid-name",
+    "wrong-import-order",
+    "broad-exception-caught",
+    "broad-exception-raised",
+    "too-few-public-methods",
+    "missing-module-docstring",
+    "missing-function-docstring",
+    "logging-fstring-interpolation",
+]
+
+[tool.black]
+line-length = 120
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
