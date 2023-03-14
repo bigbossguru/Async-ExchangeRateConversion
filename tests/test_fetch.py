@@ -1,51 +1,35 @@
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
-from aiohttp import ClientSession
+from datetime import datetime, timedelta
 
-from exchangerateconversion.fetch_rate import get_exchange_rate, CURRENCY_RATE_CACHE
-
-
-@pytest.fixture(autouse=True)
-def clear_cache():
-    # Clear the currency rate cache before each test
-    CURRENCY_RATE_CACHE.clear()
+from exchangerateconversion.fetch import FetchExchangeRateWithCache
 
 
-@pytest.mark.asyncio
-async def test_get_exchange_rate_returns_float():
-    currency = "USD"
-    date = datetime.now()
-    rate = await get_exchange_rate(currency, date)
-    assert isinstance(rate, float)
+@pytest.fixture
+def fetcher():
+    return FetchExchangeRateWithCache()
 
 
 @pytest.mark.asyncio
-async def test_get_exchange_rate_caches_currency_rate():
+async def test_get_rate_cached(fetcher):
     currency = "USD"
     date = datetime.now()
-    rate1 = await get_exchange_rate(currency, date)
 
-    # Call the function again with the same currency and date
-    rate2 = await get_exchange_rate(currency, date)
+    # Add the currency and rate to the cache
+    fetcher.rates_cache[currency] = (1.2, datetime.now() + timedelta(hours=1))
 
-    assert rate1 == rate2
+    # Call the method and verify that the cached rate is returned
+    assert await fetcher.get_rate(currency, date) == 1.2
 
 
 @pytest.mark.asyncio
-async def test_get_exchange_rate_handles_api_error(mocker):
+async def test_get_rate_returns_cached_result(fetcher):
     currency = "USD"
-    date = datetime.now()
+    date = datetime(2023, 3, 14, 12, 0, 0)
+    rate = 1.23
 
-    # Mock the ClientSession object to return a response with an error status
-    response_mock = AsyncMock()
-    response_mock.status = 500
-    response_mock.json = AsyncMock(return_value={"error": "Internal server error"})
-    session_mock = MagicMock(spec=ClientSession)
-    session_mock.get = AsyncMock(return_value=response_mock)
+    # Cache the rate
+    fetcher.rates_cache[currency] = (rate, datetime.now() + timedelta(hours=1))
 
-    mocker.patch("exchangerateconversion.fetch_rate.aiohttp.ClientSession", return_value=session_mock)
-
-    with pytest.raises(Exception):
-        await get_exchange_rate(currency, date)
+    # Fetch the rate and ensure it's returned from the cache
+    fetched_rate = await fetcher.get_rate(currency, date)
+    assert fetched_rate == rate

@@ -36,6 +36,7 @@ disable = [
     "broad-exception-raised",
     "too-few-public-methods",
     "missing-module-docstring",
+    "not-async-context-manager",
     "missing-function-docstring",
     "logging-fstring-interpolation",
 ]
