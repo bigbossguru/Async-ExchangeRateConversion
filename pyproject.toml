@@ -32,6 +32,7 @@ disable = [
     "invalid-name",
     "wrong-import-order",
     "redefined-outer-name",
+    "misplaced-bare-raise",
     "broad-exception-caught",
     "broad-exception-raised",
     "too-few-public-methods",

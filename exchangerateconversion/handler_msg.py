@@ -1,11 +1,8 @@
 import json
 import typing
-import asyncio
 import logging
-import websockets
 from datetime import datetime
 
-from .config import config
 from .fetch import FetchExchangeRateWithCache
 from .converter import convert_stake
 
@@ -29,13 +26,6 @@ async def handle_message(message: dict) -> typing.Optional[str]:
 
         # Converts the stake in the given message to EUR according to the exchange rate
         message = convert_stake(message, exchange_rate)
-        logging.debug(f"Converted stake: {json.dumps(message)}")
+        logging.info(f"Converted stake: {json.dumps(message)}")
         return json.dumps(message)
     return None
-
-
-async def send_heartbeat(websocket: websockets.WebSocketClientProtocol) -> None:  # type: ignore
-    while True:
-        await asyncio.sleep(config.HEARTBEAT_INTERVAL)
-        heartbeat_message = {"type": "heartbeat"}
-        await websocket.send(json.dumps(heartbeat_message))
