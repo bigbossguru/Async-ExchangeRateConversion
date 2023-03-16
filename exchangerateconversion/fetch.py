@@ -1,7 +1,8 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
 import aiohttp
+import logging
 
 from .config import config
 
@@ -12,18 +13,16 @@ class FetchExchangeRateWithCache:
     Fetches and store to the cache an two hours data the exchange rate for the given currency and date from the API.
     """
 
-    rates_cache: Dict[str, float] = field(default_factory=dict)
-    last_fetch: Optional[datetime] = None
+    rates_cache: Dict[str, Tuple[float, datetime]] = field(default_factory=dict)
 
     async def get_rate(self, currency: str, date: datetime) -> Optional[float]:
         """
         Fetches the exchange rate date from the external API.
         """
-        if self.last_fetch is not None and (datetime.now() == (self.last_fetch + config.EXPIRE_CACHE_TIME)):
-            self.rates_cache.clear()
-
         if currency in self.rates_cache:
-            return self.rates_cache[currency]
+            rate, expiration = self.rates_cache[currency]
+            if datetime.now() < expiration:
+                return rate
 
         async with aiohttp.ClientSession() as session:
             async with session.get(
@@ -32,8 +31,12 @@ class FetchExchangeRateWithCache:
                 data = await response.json()
                 if response.status == 200:
                     rate = data["info"]["rate"]
-                    self.rates_cache[currency] = rate
-                    if not self.rates_cache:
-                        self.last_fetch = datetime.now()
+                    self.rates_cache[currency] = (rate, datetime.now() + config.EXPIRE_CACHE_TIME)
                     return rate
         return None
+
+    async def clean_cache(self):
+        logging.info("Clear cache with the expiry time")
+        for currency, (_, expire_datetime) in self.rates_cache.items():
+            if datetime.now() == expire_datetime:
+                del self.rates_cache[currency]

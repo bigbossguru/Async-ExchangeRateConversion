@@ -6,10 +6,8 @@ from datetime import datetime
 from .fetch import FetchExchangeRateWithCache
 from .converter import convert_stake
 
-exchange_rate_cache = FetchExchangeRateWithCache()
 
-
-async def handle_message(message: dict) -> typing.Optional[str]:
+async def handle_message(message: dict, exchange_rate_cache: FetchExchangeRateWithCache) -> typing.Optional[str]:
     if message["type"] == "message":
         currency = message["payload"]["currency"]
         date = datetime.fromisoformat(message["payload"]["date"])
