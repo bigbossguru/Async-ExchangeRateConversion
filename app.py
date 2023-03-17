@@ -1,6 +1,7 @@
 """
 Entrypoint to the application that conversion currency to EUR
 """
+import sys
 import json
 import asyncio
 import logging
@@ -15,7 +16,7 @@ from exchangerateconversion.fetch import FetchExchangeRateWithCache
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] - [%(filename)s > %(funcName)s()] - %(message)s",
     datefmt="%H:%M:%S",
-    filename="app.log",
+    handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler("app.log")],
     level=logging.INFO,
 )
 
@@ -30,34 +31,33 @@ async def ws_connect():
         logging.info("Connected to websocket server")
 
         async for message in websocket:
-            last_heartbeat = time.perf_counter()
-            message = json.loads(message)
-            if message["type"] == "heartbeat":
+            while True:
                 last_heartbeat = time.perf_counter()
-                logging.info("Sent back to the server heartbeat message")
-                await websocket.send(json.dumps({"type": "heartbeat"}))
-            else:
-                message_task_result = await handle_message(message, rate_cache_handler)
-                if message_task_result:
-                    await websocket.send(message_task_result)
-                logging.info("Message with converted data sent successfully")
-                continue
+                message = json.loads(message)
+                if message["type"] == "heartbeat":
+                    last_heartbeat = time.perf_counter()
+                    await websocket.send(json.dumps({"type": "heartbeat"}))
+                    logging.info("Sent back to the server heartbeat message")
+                else:
+                    message_task_result = await handle_message(message, rate_cache_handler)
+                    if message_task_result:
+                        await websocket.send(message_task_result)
+                    logging.info("Message with converted data sent successfully")
+                    continue
 
-            if time.perf_counter() - last_heartbeat >= config.RECONNECT_DELAY:
-                logging.info("Raise error because the app didn't get heartbeat message during 2s")
-                raise Exception("The app didn't get heartbeat message during 2s")
+                if time.perf_counter() - last_heartbeat >= config.RECONNECT_DELAY:
+                    logging.info("Raise error because the app didn't get heartbeat message during 2s")
+                    raise Exception("The app didn't get heartbeat message during 2s")
 
-            await asyncio.sleep(config.HEARTBEAT_INTERVAL)
+                await asyncio.sleep(config.HEARTBEAT_INTERVAL)
 
 
 async def main():
     while True:
         try:
-            tasks = [asyncio.create_task(ws_connect()), asyncio.create_task(rate_cache_handler.clean_cache())]
-            await asyncio.gather(*tasks)
+            await ws_connect()
         except Exception:
-            logging.info("Closing websocket connection...")
-            logging.info("Trying to reconnect...")
+            logging.error("Closed websocket and try reconnect to the websocket server")
 
 
 if __name__ == "__main__":
