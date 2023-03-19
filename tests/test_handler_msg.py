@@ -1,32 +1,55 @@
-import pytest
-from datetime import datetime
 import json
+from datetime import datetime
+import pytest
 
-from exchangerateconversion.fetch import FetchExchangeRateWithCache
+from exchangerateconversion.converter import convert_stake
 from exchangerateconversion.handler_msg import handle_message
+
+
+async def mock_get_rate(currency: str, date: datetime) -> float:
+    # Mock implementation of the exchange rate API
+    if currency == "USD":
+        return 1.2
+    if currency == "GBP":
+        return 1.5
+    return None
+
+
+class MockFetchExchangeRateWithCache:
+    """
+    Mock class for featch exchange cache class
+    """
+
+    async def get_rate(self, currency: str, date: datetime) -> float:
+        return await mock_get_rate(currency, date)
 
 
 @pytest.fixture
 def exchange_rate_cache():
-    return FetchExchangeRateWithCache()
+    return MockFetchExchangeRateWithCache()
 
 
-@pytest.mark.asyncio
-async def test_fetch_exchange_rate_with_cache(exchange_rate_cache):
-    currency = "USD"
-    date = datetime(2022, 1, 1)
-    exchange_rate = await exchange_rate_cache.get_rate(currency, date)
-    assert exchange_rate is not None
-    assert isinstance(exchange_rate, float)
+def test_convert_stake():
+    message = {"id": 123, "payload": {"stake": 100, "currency": "USD", "date": "2022-01-01"}}
+    rate = 1.2
+    expected_output = {"id": 123, "payload": {"stake": 120, "currency": "EUR", "date": "2022-01-01"}}
+    output = convert_stake(message, rate)
+    assert output == expected_output
 
 
 @pytest.mark.asyncio
 async def test_handle_message(exchange_rate_cache):
-    message = {"type": "message", "payload": {"currency": "USD", "date": "2022-01-01", "stake": 100}, "id": "1234"}
+    message = {"id": 123, "payload": {"stake": 100.0, "currency": "USD", "date": "2022-01-01"}}
+    expected_output = {"id": 123, "payload": {"stake": 120.0, "currency": "EUR", "date": "2022-01-01"}}
+    output = await handle_message(message, exchange_rate_cache)
+    assert output == json.dumps(expected_output)
 
-    result = await handle_message(message, exchange_rate_cache)
-    assert result is not None
-
-    result_json = json.loads(result)
-    assert result_json["type"] == "message"
-    assert "EUR" == result_json["payload"]["currency"]
+    # Test error case when exchange rate is not found
+    message = {"id": 123, "payload": {"stake": 100, "currency": "JPY", "date": "2022-01-01"}}
+    expected_output = {
+        "type": "error",
+        "id": 123,
+        "message": "Unable to convert stake. Error: No exchange rate found for JPY to EUR",
+    }
+    output = await handle_message(message, exchange_rate_cache)
+    assert output == json.dumps(expected_output)

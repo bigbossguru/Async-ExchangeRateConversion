@@ -30,6 +30,8 @@ max-line-length = 120
 disable = [
     "no-member",
     "invalid-name",
+    "no-else-return",
+    "unused-argument",
     "wrong-import-order",
     "redefined-outer-name",
     "misplaced-bare-raise",

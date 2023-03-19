@@ -21,7 +21,7 @@ class FetchExchangeRateWithCache:
         Fetches the exchange rate date from the external API.
         """
         if currency in self.rates_cache:
-            logging.info("Get data from cache if exist")
+            logging.info(f"Get data from cache: {currency}: {self.rates_cache[currency]}")
             return self.rates_cache[currency]
 
         async with aiohttp.ClientSession() as session:
@@ -31,7 +31,7 @@ class FetchExchangeRateWithCache:
                 data = await response.json()
                 if response.status == 200:
                     rate = data["info"]["rate"]
-                    logging.info("Set cache incoming data from external API")
+                    logging.info(f"Set cache incoming data from external API: {currency}: {rate}")
                     asyncio.create_task(self.set_element_to_cache(currency, rate))
                     return rate
         return None
@@ -39,5 +39,5 @@ class FetchExchangeRateWithCache:
     async def set_element_to_cache(self, currency, rate) -> None:
         self.rates_cache[currency] = rate
         await asyncio.sleep(config.EXPIRE_CACHE_TIME)
-        logging.warning("Clear cache with the element of expiry time")
+        logging.warning(f"Clear cache with the element of expiry time: {currency}")
         del self.rates_cache[currency]

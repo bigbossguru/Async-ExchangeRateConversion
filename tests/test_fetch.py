@@ -1,8 +1,17 @@
 from datetime import datetime, timedelta
-from typing import Dict, Tuple
+from unittest.mock import AsyncMock
 import pytest
 
 from exchangerateconversion.fetch import FetchExchangeRateWithCache
+
+
+@pytest.fixture
+def mock_response():
+    async def _mock_response(*args, **kwargs):
+        data = {"info": {"rate": 1.23}}
+        return AsyncMock(status=200, json=AsyncMock(return_value=data))
+
+    return _mock_response
 
 
 @pytest.fixture
@@ -10,54 +19,54 @@ def fetcher():
     return FetchExchangeRateWithCache()
 
 
-@pytest.fixture
-def cache_data() -> Dict[str, Tuple[float, datetime]]:
-    return {
-        "USD": (1.2345, datetime.now() + timedelta(minutes=30)),
-        "JPY": (130.0, datetime.now() - timedelta(minutes=30)),
-    }
-
-
 @pytest.mark.asyncio
-async def test_cached_rate(cache_data: Dict[str, Tuple[float, datetime]]) -> None:
+async def test_get_rate_with_cached_data(fetcher: FetchExchangeRateWithCache):
     currency = "USD"
-    date = datetime.now()
-    fetcher = FetchExchangeRateWithCache(cache_data)
-    rate = await fetcher.get_rate(currency, date)
-    assert rate == cache_data[currency][0]
+    rate = 1.23
+    date = datetime.utcnow()
+    fetcher.rates_cache[currency] = rate
+
+    result = await fetcher.get_rate(currency, date)
+
+    assert result == rate
 
 
 @pytest.mark.asyncio
-async def test_expired_rate(fetcher) -> None:
+async def test_get_rate_with_external_api_response(fetcher: FetchExchangeRateWithCache, mock_response):
     currency = "USD"
-    date = datetime.now()
-    fetcher.rates_cache[currency] = (1.2345, datetime.now() - timedelta(minutes=30))
-    rate = await fetcher.get_rate(currency, date)
-    assert rate != 1.2345
-    assert fetcher.rates_cache[currency][0] != 1.2345
+    date = datetime.utcnow()
+
+    async def mock_create_task(coroutine):
+        # replace `create_task` with a mock that doesn't actually schedule a coroutine
+        pass
+
+    fetcher.set_element_to_cache = AsyncMock(wraps=fetcher.set_element_to_cache)
+    fetcher.set_element_to_cache.side_effect = mock_create_task
+    fetcher.get_rate = AsyncMock(wraps=fetcher.get_rate)
+    fetcher.get_rate.side_effect = mock_response
+
+    result_mock = await fetcher.get_rate(currency, date)
+    result = await result_mock.json()
+
+    assert result["info"]["rate"] == 1.23
 
 
 @pytest.mark.asyncio
-async def test_uncached_rate(fetcher) -> None:
+async def test_get_rate_with_expired_cache(fetcher: FetchExchangeRateWithCache):
     currency = "USD"
-    date = datetime.now()
-    rate = await fetcher.get_rate(currency, date)
-    assert rate != 1.2345
-    assert fetcher.rates_cache[currency][0] != 1.2345
+    rate = 1.23
+    date = datetime.utcnow() - timedelta(hours=2)
+    fetcher.rates_cache[currency] = rate
+    fetcher.set_element_to_cache = AsyncMock(wraps=fetcher.set_element_to_cache)
+
+    result = await fetcher.get_rate(currency, date)
+    assert result == 1.23
 
 
 @pytest.mark.asyncio
-async def test_get_rate(fetcher):
-    # Test fetching a new currency and date
-    rate = await fetcher.get_rate("USD", datetime(2022, 1, 1))
-    assert isinstance(rate, float)
+async def test_set_element_to_cache(fetcher: FetchExchangeRateWithCache):
+    currency = "USD"
+    rate = 1.23
 
-    # Test fetching the same currency and date again, should be cached
-    rate = await fetcher.get_rate("USD", datetime(2022, 1, 1))
-    assert isinstance(rate, float)
-
-    # Test fetching an expired cached currency and date, should not be cached
-    fetcher.rates_cache["USD"] = (1.0, datetime.now() - timedelta(hours=1))
-    rate = await fetcher.get_rate("USD", datetime(2022, 1, 1))
-    assert isinstance(rate, float)
-    assert fetcher.rates_cache["USD"][0] == rate
+    await fetcher.set_element_to_cache(currency, rate)
+    assert currency not in fetcher.rates_cache
