@@ -8,7 +8,7 @@ class Config(BaseSettings):
 
     WEBSOCKET_ENDPOINT: str = "wss://currency-assignment.ematiq.com"
     EXCHANGE_RATE_API: str = "https://api.exchangerate.host"
-    EXPIRE_CACHE_TIME: int = 7200  # 2h in the seconds
+    EXPIRE_CACHE_TIME: int = 90  # 1m30s in the seconds
     HEARTBEAT_INTERVAL: int = 1  # seconds
     RECONNECT_DELAY: int = 2  # seconds
 
