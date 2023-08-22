@@ -10,7 +10,7 @@ packages = [{include = "exchangerateconversion"}]
 [tool.poetry.dependencies]
 python = "^3.11"
 websockets = "^10.4"
-aiohttp = "^3.8.4"
+aiohttp = "^3.8.5"
 pydantic = "^1.10.6"
 
 
